@@ -3,7 +3,18 @@
 
 #include "ds.h"
 
-void ui_main_menu(ParkingSystem *ps);
+/* 登录界面，返回登录成功的用户角色，失败返回 -1 */
+int ui_login(UserDatabase *db, UserRole *out_role, char out_username[32]);
+
+/* 管理员-用户管理子菜单 */
+void ui_user_manage(UserDatabase *db);
+
+/* 角色对应的主菜单 */
+void ui_admin_menu(ParkingSystem *ps);
+void ui_operator_menu(ParkingSystem *ps);
+void ui_customer_menu(ParkingSystem *ps, const char *my_plate);
+
+/* 各功能界面 */
 void ui_entry(ParkingSystem *ps);
 void ui_exit(ParkingSystem *ps);
 void ui_find(ParkingSystem *ps);

@@ -44,7 +44,6 @@ int save_data(ParkingSystem *ps, const char *filename) {
            ps->history_count, fp);
 
     fclose(fp);
-    printf("数据已保存到 %s\n", filename);
     return 1;
 }
 
@@ -126,7 +125,68 @@ void rebuild_hash_from_spots(ParkingSystem *ps) {
                     }
                     strcpy(rec->plate, ps->spots[f][r][c].plate);
                     rec->loc = make_loc(f, r, c);
-                    rec->entry_time = time(NULL);
+                    rec->entry_time = ps->spots[f][r][c].entry_time;
                     ht_insert(&ps->plate_index, rec);
                 }
+}
+
+/* ═══════════════════════════════════════════
+   用户数据持久化
+   ═══════════════════════════════════════════ */
+
+int save_users(UserDatabase *db, const char *filename) {
+    if (db == NULL || filename == NULL) return 0;
+
+    FILE *fp = fopen(filename, "wb");
+    if (fp == NULL) {
+        printf("无法保存用户数据到 %s\n", filename);
+        return 0;
+    }
+
+    if (fwrite(&db->count, sizeof(int), 1, fp) != 1 ||
+        (db->count > 0 && fwrite(db->users, sizeof(User), db->count, fp) != (size_t)db->count)) {
+        printf("写入用户数据失败！\n");
+        fclose(fp);
+        return 0;
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+int load_users(UserDatabase *db, const char *filename) {
+    if (db == NULL || filename == NULL) return 0;
+
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) return 0;  /* 首次运行，文件不存在 */
+
+    int count;
+    if (fread(&count, sizeof(int), 1, fp) != 1) {
+        printf("读取用户文件头失败！\n");
+        fclose(fp); return 0;
+    }
+
+    if (count < 0 || count > 10000) {
+        printf("用户数据损坏（异常数量: %d）！\n", count);
+        fclose(fp); return 0;
+    }
+
+    while (db->capacity < count) {
+        int new_cap = db->capacity > 0 ? db->capacity * 2 : 8;
+        User *new_users = (User *)realloc(db->users, sizeof(User) * new_cap);
+        if (new_users == NULL) { fclose(fp); return 0; }
+        db->users = new_users;
+        db->capacity = new_cap;
+    }
+
+    size_t read_count = fread(db->users, sizeof(User), count, fp);
+    if (read_count != (size_t)count) {
+        printf("读取用户数据不完整 (期望 %d, 实际 %zu)！\n", count, read_count);
+        fclose(fp); return 0;
+    }
+    db->count = count;
+
+    fclose(fp);
+    printf("已加载 %d 个用户账号\n", count);
+    return 1;
 }

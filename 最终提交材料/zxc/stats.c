@@ -215,6 +215,13 @@ void stats_floor_usage(ParkingSystem *ps) {
     for (int i = 0; i < ps->history_count; i++)
         stats[ps->history[i].loc.floor].count++;
 
+    /* 加上当前在场车辆 */
+    for (int f = 0; f < FLOORS; f++)
+        for (int r = 0; r < ROWS; r++)
+            for (int c = 0; c < COLS; c++)
+                if (ps->spots[f][r][c].status == SPOT_OCCUPIED)
+                    stats[f].count++;
+
     for (int f = 0; f < FLOORS; f++)
         stats[f].turnover = (double)stats[f].count / spots_per_floor;
 
@@ -243,10 +250,20 @@ void stats_peak_hours(ParkingSystem *ps) {
 
     int hour_count[24] = {0};
 
+    /* 历史交易（已出场车辆） */
     for (int i = 0; i < ps->history_count; i++) {
         struct tm *tm_entry = localtime(&ps->history[i].entry_time);
         hour_count[tm_entry->tm_hour]++;
     }
+
+    /* 当前在场车辆 */
+    for (int f = 0; f < FLOORS; f++)
+        for (int r = 0; r < ROWS; r++)
+            for (int c = 0; c < COLS; c++)
+                if (ps->spots[f][r][c].status == SPOT_OCCUPIED) {
+                    struct tm *tm_entry = localtime(&ps->spots[f][r][c].entry_time);
+                    hour_count[tm_entry->tm_hour]++;
+                }
 
     /* Find top 3 hours */
     int top_hours[3] = {-1, -1, -1};

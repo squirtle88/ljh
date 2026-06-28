@@ -26,6 +26,35 @@ typedef enum {
     NOT_PARKED
 } ExitResult;
 
+/* 用户角色 */
+typedef enum {
+    USER_ADMIN,      /* 管理员：全部功能 */
+    USER_OPERATOR,   /* 操作员：入场/出场/查询/查看 */
+    USER_CUSTOMER    /* 车主：仅查询自己的车辆 */
+} UserRole;
+
+/* 用户账号 */
+typedef struct {
+    char username[32];
+    char password[32];
+    UserRole role;
+    char plate[16];   /* 车主绑定的车牌（管理员/操作员为空） */
+} User;
+
+/* 用户数据库（动态数组） */
+typedef struct {
+    User *users;
+    int count;
+    int capacity;
+} UserDatabase;
+
+void user_db_init(UserDatabase *db);
+void user_db_destroy(UserDatabase *db);
+int user_db_add(UserDatabase *db, const char *username, const char *password, UserRole role, const char *plate);
+int user_db_delete(UserDatabase *db, const char *username);
+int user_db_find(UserDatabase *db, const char *username, const char *password, UserRole *out_role);
+int user_db_exists(UserDatabase *db, const char *username);
+
 typedef struct {
     int floor;
     int row;
@@ -34,8 +63,9 @@ typedef struct {
 
 typedef struct {
     SpotLocation loc;
-    SpotStatus status;
-    char plate[16];
+    SpotStatus   status;
+    char         plate[16];
+    time_t       entry_time;
 } ParkingSpot;
 
 typedef struct {
@@ -99,6 +129,7 @@ typedef struct {
     int history_capacity;
     FeeRule fee_rule;
     double total_revenue;
+    UserDatabase user_db;
 } ParkingSystem;
 
 void ds_init(ParkingSystem *ps);
@@ -108,6 +139,7 @@ void stack_init(FreeSpotStack *s, int capacity);
 void stack_destroy(FreeSpotStack *s);
 void stack_push(FreeSpotStack *s, SpotLocation loc);
 SpotLocation stack_pop(FreeSpotStack *s);
+SpotLocation stack_pop_random(FreeSpotStack *s);
 int stack_is_empty(const FreeSpotStack *s);
 int stack_size(const FreeSpotStack *s);
 

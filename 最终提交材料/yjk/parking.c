@@ -45,6 +45,7 @@ static void occupy_spot(ParkingSystem *ps,
 
     ps->spots[loc.floor][loc.row][loc.col].status = SPOT_OCCUPIED;
     copy_plate(ps->spots[loc.floor][loc.row][loc.col].plate, plate);
+    ps->spots[loc.floor][loc.row][loc.col].entry_time = entry_time;
     ht_insert(&ps->plate_index, rec);
 }
 
@@ -100,7 +101,7 @@ EntryResult vehicle_entry(ParkingSystem *ps, const char *plate) {
         return PARKING_FULL;
     }
 
-    occupy_spot(ps, stack_pop(&ps->free_spots), plate, time(NULL));
+    occupy_spot(ps, stack_pop_random(&ps->free_spots), plate, time(NULL));
     return ENTRY_SUCCESS;
 }
 
@@ -141,6 +142,7 @@ ExitResult vehicle_exit(ParkingSystem *ps, const char *plate, double *out_fee) {
 
     ps->spots[released_loc.floor][released_loc.row][released_loc.col].status = SPOT_FREE;
     ps->spots[released_loc.floor][released_loc.row][released_loc.col].plate[0] = '\0';
+    ps->spots[released_loc.floor][released_loc.row][released_loc.col].entry_time = 0;
 
     ht_remove(&ps->plate_index, plate);
     free(rec);

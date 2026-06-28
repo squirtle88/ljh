@@ -82,6 +82,20 @@ SpotLocation stack_pop(FreeSpotStack *s) {
     return s->spots[s->top--];
 }
 
+SpotLocation stack_pop_random(FreeSpotStack *s) {
+    if (s == NULL || stack_is_empty(s)) {
+        fprintf(stderr, "stack_pop_random: empty stack\n");
+        abort();
+    }
+
+    /* 随机选一个位置，与栈顶交换后弹出，保持 O(1) */
+    int idx = rand() % (s->top + 1);
+    SpotLocation chosen = s->spots[idx];
+    s->spots[idx] = s->spots[s->top];
+    s->top--;
+    return chosen;
+}
+
 int stack_is_empty(const FreeSpotStack *s) {
     return s == NULL || s->top == -1;
 }
@@ -286,12 +300,15 @@ void ds_init(ParkingSystem *ps) {
         return;
     }
 
+    srand((unsigned int)time(NULL));
+
     for (int f = 0; f < FLOORS; f++) {
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
                 ps->spots[f][r][c].loc = make_loc(f, r, c);
                 ps->spots[f][r][c].status = SPOT_FREE;
                 ps->spots[f][r][c].plate[0] = '\0';
+                ps->spots[f][r][c].entry_time = 0;
             }
         }
     }
@@ -322,6 +339,8 @@ void ds_init(ParkingSystem *ps) {
     ps->fee_rule.rate_per_hour = 4.0;
     ps->fee_rule.max_daily = 40.0;
     ps->total_revenue = 0.0;
+
+    user_db_init(&ps->user_db);
 }
 
 void ds_destroy(ParkingSystem *ps) {
@@ -337,4 +356,106 @@ void ds_destroy(ParkingSystem *ps) {
     ps->history = NULL;
     ps->history_count = 0;
     ps->history_capacity = 0;
+
+    user_db_destroy(&ps->user_db);
+}
+
+/* ═══════════════════════════════════════════
+   用户数据库操作
+   ═══════════════════════════════════════════ */
+
+void user_db_init(UserDatabase *db) {
+    if (db == NULL) return;
+    db->capacity = 8;
+    db->users = (User *)malloc(sizeof(User) * db->capacity);
+    if (db->users == NULL) {
+        fprintf(stderr, "user_db_init: memory allocation failed\n");
+        exit(EXIT_FAILURE);
+    }
+    db->count = 0;
+}
+
+void user_db_destroy(UserDatabase *db) {
+    if (db == NULL) return;
+    free(db->users);
+    db->users = NULL;
+    db->count = 0;
+    db->capacity = 0;
+}
+
+int user_db_add(UserDatabase *db, const char *username, const char *password, UserRole role, const char *plate) {
+    if (db == NULL || username == NULL || password == NULL) return 0;
+
+    /* 检查用户名是否已存在 */
+    for (int i = 0; i < db->count; i++) {
+        if (strcmp(db->users[i].username, username) == 0) return 0;
+    }
+
+    /* 扩容 */
+    if (db->count >= db->capacity) {
+        int new_cap = db->capacity * 2;
+        User *new_users = (User *)realloc(db->users, sizeof(User) * new_cap);
+        if (new_users == NULL) return 0;
+        db->users = new_users;
+        db->capacity = new_cap;
+    }
+
+    strncpy(db->users[db->count].username, username, 31);
+    db->users[db->count].username[31] = '\0';
+    strncpy(db->users[db->count].password, password, 31);
+    db->users[db->count].password[31] = '\0';
+    db->users[db->count].role = role;
+    if (plate != NULL) {
+        strncpy(db->users[db->count].plate, plate, 15);
+        db->users[db->count].plate[15] = '\0';
+    } else {
+        db->users[db->count].plate[0] = '\0';
+    }
+    db->count++;
+    return 1;
+}
+
+int user_db_delete(UserDatabase *db, const char *username) {
+    if (db == NULL || username == NULL) return 0;
+    /* 不允许删除最后一个管理员 */
+    int admin_count = 0;
+    int target_is_admin = 0;
+    for (int i = 0; i < db->count; i++) {
+        if (db->users[i].role == USER_ADMIN) {
+            admin_count++;
+            if (strcmp(db->users[i].username, username) == 0)
+                target_is_admin = 1;
+        }
+    }
+    if (target_is_admin && admin_count <= 1) return 0;  /* 至少保留一个管理员 */
+
+    for (int i = 0; i < db->count; i++) {
+        if (strcmp(db->users[i].username, username) == 0) {
+            /* 用最后一个元素覆盖当前位置 */
+            db->users[i] = db->users[db->count - 1];
+            db->count--;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int user_db_find(UserDatabase *db, const char *username, const char *password, UserRole *out_role) {
+    if (db == NULL || username == NULL || password == NULL) return 0;
+    for (int i = 0; i < db->count; i++) {
+        if (strcmp(db->users[i].username, username) == 0 &&
+            strcmp(db->users[i].password, password) == 0) {
+            if (out_role != NULL) *out_role = db->users[i].role;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int user_db_exists(UserDatabase *db, const char *username) {
+    if (db == NULL || username == NULL) return 0;
+    for (int i = 0; i < db->count; i++) {
+        if (strcmp(db->users[i].username, username) == 0) return 1;
+    }
+    return 0;
 }

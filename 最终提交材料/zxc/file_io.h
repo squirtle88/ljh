@@ -20,4 +20,7 @@ int save_data(ParkingSystem *ps, const char *filename);
 int load_data(ParkingSystem *ps, const char *filename);
 void rebuild_hash_from_spots(ParkingSystem *ps);
 
+int save_users(UserDatabase *db, const char *filename);
+int load_users(UserDatabase *db, const char *filename);
+
 #endif
